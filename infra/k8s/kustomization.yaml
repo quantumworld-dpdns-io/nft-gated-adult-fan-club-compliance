@@ -1,0 +1,64 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: nft-platform
+
+namePrefix: nft-fanclub-
+
+namespace: nft-fanclub
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres-statefulset.yaml
+  - redis-deployment.yaml
+  - backend-deployment.yaml
+  - frontend-deployment.yaml
+  - ingress.yaml
+  - network-policies.yaml
+  - tetragon-policies.yaml
+  - prometheus-monitoring.yaml
+
+configMapGenerator:
+  - name: app-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=production
+
+secretGenerator:
+  - name: app-secrets
+    behavior: replace
+    type: Opaque
+    files:
+      - secrets.env
+
+images:
+  - name: ghcr.io/quantumworld-dpdns-io/nft-fanclub-backend
+    newTag: latest
+  - name: ghcr.io/quantumworld-dpdns-io/nft-fanclub-frontend
+    newTag: latest
+
+patchesStrategicMerge:
+  - |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: backend
+    spec:
+      template:
+        spec:
+          containers:
+            - name: backend
+              image: ghcr.io/quantumworld-dpdns-io/nft-fanclub-backend:latest
+
+patchesJson6902:
+  - target:
+      version: v1
+      kind: ConfigMap
+      name: app-config
+    patch:
+      - op: add
+        path: /data/FF_MAINTENANCE_MODE
+        value: "false"

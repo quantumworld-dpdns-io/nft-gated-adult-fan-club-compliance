@@ -1,0 +1,183 @@
+name: ZK Circuits
+
+on:
+  push:
+    paths:
+      - zk-circuits/**
+      - .github/workflows/zk-circuits.yml
+    branches: [main, dev]
+  pull_request:
+    paths:
+      - zk-circuits/**
+      - .github/workflows/zk-circuits.yml
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NOIR_VERSION: '1.0.0-beta.0'
+
+jobs:
+  compile:
+    name: Compile Circuits
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        circuit: [age-verification, membership-proof]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install noirup
+        run: |
+          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install \
+            | bash
+          echo "$HOME/.nargo/bin" >> $GITHUB_PATH
+
+      - name: Install Noir
+        run: noirup -v ${{ env.NOIR_VERSION }}
+
+      - name: Compile ${{ matrix.circuit }}
+        run: |
+          cd zk-circuits/${{ matrix.circuit }}
+          nargo compile
+
+      - name: Cache compiled circuits
+        uses: actions/cache@v4
+        with:
+          path: zk-circuits/${{ matrix.circuit }}/target/
+          key: ${{ runner.os }}-noir-${{ matrix.circuit }}-${{ hashFiles(format('zk-circuits/{0}/src/**', matrix.circuit), format('zk-circuits/{0}/Nargo.toml', matrix.circuit)) }}
+
+  test:
+    name: Circuit Tests
+    needs: compile
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        circuit: [age-verification, membership-proof]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install noirup
+        run: |
+          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install \
+            | bash
+          echo "$HOME/.nargo/bin" >> $GITHUB_PATH
+
+      - name: Install Noir
+        run: noirup -v ${{ env.NOIR_VERSION }}
+
+      - name: Restore compiled artifacts
+        uses: actions/cache@v4
+        with:
+          path: zk-circuits/${{ matrix.circuit }}/target/
+          key: ${{ runner.os }}-noir-${{ matrix.circuit }}-${{ hashFiles(format('zk-circuits/{0}/src/**', matrix.circuit), format('zk-circuits/{0}/Nargo.toml', matrix.circuit)) }}
+
+      - name: Run tests for ${{ matrix.circuit }}
+        run: |
+          cd zk-circuits/${{ matrix.circuit }}
+          nargo test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.circuit }}-test-results
+          path: zk-circuits/${{ matrix.circuit }}/target/
+          if-no-files-found: ignore
+
+  size-check:
+    name: Circuit Size Check
+    needs: compile
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        circuit: [age-verification, membership-proof]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install noirup
+        run: |
+          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install \
+            | bash
+          echo "$HOME/.nargo/bin" >> $GITHUB_PATH
+
+      - name: Install Noir
+        run: noirup -v ${{ env.NOIR_VERSION }}
+
+      - name: Restore compiled artifacts
+        uses: actions/cache@v4
+        with:
+          path: zk-circuits/${{ matrix.circuit }}/target/
+          key: ${{ runner.os }}-noir-${{ matrix.circuit }}-${{ hashFiles(format('zk-circuits/{0}/src/**', matrix.circuit), format('zk-circuits/{0}/Nargo.toml', matrix.circuit)) }}
+
+      - name: Check circuit size for ${{ matrix.circuit }}
+        run: |
+          cd zk-circuits/${{ matrix.circuit }}
+          nargo info
+
+      - name: Circuit size report
+        run: |
+          echo "## Circuit Size Report - ${{ matrix.circuit }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          nargo info 2>&1 >> $GITHUB_STEP_SUMMARY || echo "nargo info completed"
+
+  sol-verifier:
+    name: Generate Solidity Verifier
+    needs: compile
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        circuit: [age-verification, membership-proof]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install noirup
+        run: |
+          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install \
+            | bash
+          echo "$HOME/.nargo/bin" >> $GITHUB_PATH
+
+      - name: Install Noir
+        run: noirup -v ${{ env.NOIR_VERSION }}
+
+      - name: Restore compiled artifacts
+        uses: actions/cache@v4
+        with:
+          path: zk-circuits/${{ matrix.circuit }}/target/
+          key: ${{ runner.os }}-noir-${{ matrix.circuit }}-${{ hashFiles(format('zk-circuits/{0}/src/**', matrix.circuit), format('zk-circuits/{0}/Nargo.toml', matrix.circuit)) }}
+
+      - name: Generate Solidity verifier for ${{ matrix.circuit }}
+        run: |
+          cd zk-circuits/${{ matrix.circuit }}
+          nargo codegen-verifier
+
+      - name: Upload Solidity verifier
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.circuit }}-solidity-verifier
+          path: zk-circuits/${{ matrix.circuit }}/contract/
+
+  check-prover-toml:
+    name: Check Prover Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Prover.toml presence
+        run: |
+          for circuit in zk-circuits/*/; do
+            name=$(basename "$circuit")
+            if [ -f "zk-circuits/$name/Prover.toml" ]; then
+              echo "✅ $name: Prover.toml exists"
+            else
+              echo "⚠️ $name: Prover.toml missing"
+            fi
+            if [ -f "zk-circuits/$name/Verifier.toml" ]; then
+              echo "✅ $name: Verifier.toml exists"
+            else
+              echo "⚠️ $name: Verifier.toml missing"
+            fi
+          done
