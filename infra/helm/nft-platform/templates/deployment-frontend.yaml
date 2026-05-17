@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nft-platform.fullname" . }}-frontend
+  labels:
+    {{- include "nft-platform.frontend.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.autoscaling.minReplicas | default 2 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "nft-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        {{- include "nft-platform.frontend.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.frontend.port | quote }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Values.frontend.name }}
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "nft-platform.fullname" . }}-config
+            - secretRef:
+                name: {{ include "nft-platform.fullname" . }}-secrets
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          livenessProbe:
+            {{- include "nft-platform.probe" (dict "probe" .Values.frontend.probes.liveness "port" .Values.frontend.port) | nindent 12 }}
+          readinessProbe:
+            {{- include "nft-platform.probe" (dict "probe" .Values.frontend.probes.readiness "port" .Values.frontend.port) | nindent 12 }}
+          startupProbe:
+            {{- include "nft-platform.probe" (dict "probe" .Values.frontend.probes.startup "port" .Values.frontend.port) | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.frontend.securityContext | nindent 12 }}
+      {{- with .Values.frontend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.frontend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

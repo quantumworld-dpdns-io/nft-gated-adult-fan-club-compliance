@@ -1,0 +1,50 @@
+apiVersion: v2
+name: nft-platform
+description: NFT Fan Club Compliance Platform - A Web3 platform for gated adult content with compliance, age verification, and KYC/AML controls
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+icon: https://raw.githubusercontent.com/quantumworld-dpdns-io/nft-gated-adult-fan-club-compliance/main/docs/logo.png
+keywords:
+  - nft
+  - fan-club
+  - compliance
+  - age-verification
+  - kyc
+  - aml
+  - web3
+  - blockchain
+home: https://github.com/quantumworld-dpdns-io/nft-gated-adult-fan-club-compliance
+sources:
+  - https://github.com/quantumworld-dpdns-io/nft-gated-adult-fan-club-compliance
+maintainers:
+  - name: DevOps Team
+    email: devops@nft-fanclub.example.com
+    url: https://nft-fanclub.example.com
+dependencies:
+  - name: postgresql
+    version: ~12.x
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    alias: postgresql
+  - name: redis
+    version: ~18.x
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    alias: redis
+  - name: prometheus
+    version: ~25.x
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoring.enabled
+    alias: prometheus
+  - name: cert-manager
+    version: ~1.x
+    repository: https://charts.jetstack.io
+    condition: ingress.tls
+    alias: cert-manager
+annotations:
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial Helm chart for NFT Fan Club Compliance Platform
+  artifacthub.io/containsSecurityUpdates: "false"
+  artifacthub.io/prerelease: "false"
