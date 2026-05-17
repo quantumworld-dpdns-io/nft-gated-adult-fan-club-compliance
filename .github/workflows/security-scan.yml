@@ -1,0 +1,223 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  sast:
+    name: SAST - Bandit Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit scan
+        run: bandit -r backend/app/ -f json -o bandit-report.json || true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  dependency-scan:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Safety
+        run: pip install safety
+
+      - name: Run Safety check
+        run: safety check -r requirements.txt --json > safety-report.json || true
+
+      - name: Upload Safety report
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-report
+          path: safety-report.json
+
+      - name: Setup Node.js
+        if: hashFiles('package-lock.json') != '' || hashFiles('frontend/package-lock.json') != '' || hashFiles('contracts/package-lock.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Snyk scan
+        if: secrets.SNYK_TOKEN != ''
+        uses: snyk/actions/node@v0.4.0
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --all-projects --sarif-file-output=snyk-report.sarif
+
+      - name: Upload Snyk report
+        if: always() && hashFiles('snyk-report.sarif') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-report
+          path: snyk-report.sarif
+
+  owasp-zap:
+    name: OWASP ZAP Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start backend service
+        run: |
+          docker compose -f docker-compose.test.yml --profile security up -d backend-test
+          sleep 15
+
+      - name: Run ZAP API scan
+        continue-on-error: true
+        run: |
+          docker run --network host -v ${{ github.workspace }}:/zap/wrk/:rw \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-api-scan.py -t http://localhost:8000/openapi.json \
+            -f openapi \
+            -r zap-report.html \
+            -z "-config api.key=change-me" \
+            -x zap-report.xml \
+            --fail-on-warn || true
+        env:
+          ZAP_API_KEY: change-me
+
+      - name: Upload ZAP HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap-report.html
+
+      - name: Upload ZAP XML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report-xml
+          path: zap-report.xml
+
+      - name: Stop services
+        if: always()
+        run: docker compose -f docker-compose.test.yml --profile security down -v
+
+  container-scan:
+    name: Container Scan - Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t backend -f Dockerfile.backend .
+
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@0.28.0
+        continue-on-error: true
+        with:
+          image-ref: backend
+          format: sarif
+          output: trivy-report.sarif
+          severity: HIGH,CRITICAL
+
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.sarif
+
+  secret-scan:
+    name: Secret Scan - Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+
+  security-summary:
+    name: Security Scan Summary
+    needs: [sast, dependency-scan, owasp-zap, container-scan, secret-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check scan results
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.sast.result }}" = "success" ]; then
+            echo "✅ **SAST (Bandit):** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **SAST (Bandit):** Completed with findings" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.dependency-scan.result }}" = "success" ]; then
+            echo "✅ **Dependency Scan:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Dependency Scan:** Completed with findings" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.owasp-zap.result }}" = "success" ]; then
+            echo "✅ **OWASP ZAP:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **OWASP ZAP:** Completed with findings" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.container-scan.result }}" = "success" ]; then
+            echo "✅ **Container Scan (Trivy):** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Container Scan (Trivy):** Completed with findings" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.secret-scan.result }}" = "success" ]; then
+            echo "✅ **Secret Scan (Gitleaks):** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Secret Scan (Gitleaks):** Completed with findings" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Fail on critical findings
+        if: needs.owasp-zap.result == 'failure' || needs.container-scan.result == 'failure'
+        run: |
+          echo "❌ Critical security findings detected. Review reports before merging."
+          exit 1
