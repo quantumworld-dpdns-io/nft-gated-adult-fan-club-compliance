@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "NFT Fanclub",
+    "slug": "nft-fanclub-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0a"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nftfanclub.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is used for document upload during age verification."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
+      },
+      "package": "com.nftfanclub.mobile",
+      "permissions": ["CAMERA"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Camera is used for document upload during age verification."
+        }
+      ],
+      "expo-local-authentication"
+    ],
+    "scheme": "nft-fanclub"
+  }
+}
