@@ -1,0 +1,41 @@
+{
+  "context": {
+    "name": "NFTFanClub-API",
+    "description": "Context for NFT-gated adult fan club compliance API",
+    "includePaths": [
+      "http://localhost:8000/.*",
+      "https://api.*.com/.*"
+    ],
+    "excludePaths": [],
+    "authentication": {
+      "method": "bearer",
+      "parameters": {
+        "bearerHeaderName": "Authorization",
+        "bearerToken": "",
+        "bearerTokenPrefix": "Bearer "
+      },
+      "verification": {
+        "method": "response",
+        "loggedInRegex": "\\\"access_token\\\"\\s*:\\s*\\\"[^\\\"]+\\\"",
+        "loggedOutRegex": "\\\"detail\\\"\\s*:\\s*\\\"(Unauthorized|Not authenticated|Invalid token)\\\"",
+        "pollFrequency": 60,
+        "pollUnits": "requests"
+      }
+    },
+    "sessionManagement": {
+      "method": "cookie",
+      "parameters": {}
+    },
+    "techStack": {
+      "python": ["3.12"],
+      "fastapi": ["0.115"],
+      "sqlalchemy": ["2.0"],
+      "jwt": ["python-jose"]
+    },
+    "urlParser": {
+      "host": "localhost",
+      "port": 8000,
+      "scheme": "http"
+    }
+  }
+}

@@ -1,0 +1,198 @@
+{{- if .Values.tetragon.enabled }}
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: {{ include "nft-platform.fullname" . }}-detect-shell-execution
+  labels:
+    {{- include "nft-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: security
+spec:
+  kprobes:
+    - call: "security_file_open"
+      syscall: false
+      args:
+        - index: 0
+          type: "file"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "/bin/sh"
+                - "/bin/bash"
+                - "/bin/dash"
+                - "/bin/zsh"
+                - "/bin/ksh"
+                - "/bin/csh"
+                - "/bin/ash"
+                - "/bin/tcsh"
+          matchActions:
+            - action: Sigkill
+              argError: 0
+              arg: 0
+      matchNamespaces:
+        - namespace: {{ .Values.tetragon.namespace | default .Release.Namespace }}
+          operator: In
+          values:
+            - "{{ .Values.tetragon.namespace | default .Release.Namespace }}"
+
+---
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: {{ include "nft-platform.fullname" . }}-detect-package-manager
+  labels:
+    {{- include "nft-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: security
+spec:
+  kprobes:
+    - call: "sys_execve"
+      syscall: true
+      args:
+        - index: 0
+          type: "string"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "/usr/bin/apt"
+                - "/usr/bin/apt-get"
+                - "/usr/bin/apk"
+                - "/usr/bin/yum"
+                - "/usr/bin/dnf"
+                - "/usr/bin/rpm"
+                - "/usr/bin/dpkg"
+                - "/usr/bin/pacman"
+                - "/usr/bin/zypper"
+                - "/usr/bin/emerge"
+          matchActions:
+            - action: Sigkill
+              argError: 0
+              arg: 0
+      matchNamespaces:
+        - namespace: {{ .Values.tetragon.namespace | default .Release.Namespace }}
+          operator: In
+          values:
+            - "{{ .Values.tetragon.namespace | default .Release.Namespace }}"
+
+---
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: {{ include "nft-platform.fullname" . }}-detect-writable-path-exec
+  labels:
+    {{- include "nft-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: security
+spec:
+  kprobes:
+    - call: "sys_execve"
+      syscall: true
+      args:
+        - index: 0
+          type: "string"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Prefix"
+              values:
+                - "/tmp/"
+                - "/dev/shm/"
+                - "/var/tmp/"
+                - "/run/"
+                - "/proc/"
+          matchActions:
+            - action: Sigkill
+              argError: 0
+              arg: 0
+      matchNamespaces:
+        - namespace: {{ .Values.tetragon.namespace | default .Release.Namespace }}
+          operator: In
+          values:
+            - "{{ .Values.tetragon.namespace | default .Release.Namespace }}"
+
+---
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: {{ include "nft-platform.fullname" . }}-detect-crypto-miner
+  labels:
+    {{- include "nft-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: security
+spec:
+  kprobes:
+    - call: "sys_execve"
+      syscall: true
+      args:
+        - index: 0
+          type: "string"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "/usr/bin/xmrig"
+                - "/usr/local/bin/xmrig"
+                - "/opt/xmrig/xmrig"
+                - "/usr/bin/cpuminer"
+                - "/usr/local/bin/cpuminer"
+                - "/usr/bin/ethminer"
+                - "/usr/local/bin/ethminer"
+                - "/usr/bin/t-rex"
+                - "/usr/local/bin/t-rex"
+                - "/usr/bin/nbminer"
+                - "/usr/local/bin/nbminer"
+                - "/usr/bin/lolminer"
+                - "/usr/local/bin/lolminer"
+                - "/usr/bin/teamredminer"
+                - "/usr/local/bin/teamredminer"
+                - "/usr/bin/phoenixminer"
+                - "/usr/local/bin/phoenixminer"
+                - "/usr/bin/gminer"
+                - "/usr/local/bin/gminer"
+          matchActions:
+            - action: Sigkill
+              argError: 0
+              arg: 0
+      matchNamespaces:
+        - namespace: {{ .Values.tetragon.namespace | default .Release.Namespace }}
+          operator: In
+          values:
+            - "{{ .Values.tetragon.namespace | default .Release.Namespace }}"
+
+---
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: {{ include "nft-platform.fullname" . }}-detect-netcat-socat
+  labels:
+    {{- include "nft-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: security
+spec:
+  kprobes:
+    - call: "sys_execve"
+      syscall: true
+      args:
+        - index: 0
+          type: "string"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "/usr/bin/nc"
+                - "/usr/bin/nc.traditional"
+                - "/usr/bin/ncat"
+                - "/usr/bin/socat"
+                - "/bin/nc"
+                - "/bin/nc.traditional"
+          matchActions:
+            - action: Sigkill
+              argError: 0
+              arg: 0
+      matchNamespaces:
+        - namespace: {{ .Values.tetragon.namespace | default .Release.Namespace }}
+          operator: In
+          values:
+            - "{{ .Values.tetragon.namespace | default .Release.Namespace }}"
+{{- end }}
