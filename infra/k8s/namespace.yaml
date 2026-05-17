@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nft-fanclub
+  labels:
+    name: nft-fanclub
+    environment: production
+    app.kubernetes.io/name: nft-fanclub
+    app.kubernetes.io/part-of: nft-platform

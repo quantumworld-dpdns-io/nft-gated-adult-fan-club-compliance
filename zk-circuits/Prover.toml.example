@@ -1,0 +1,13 @@
+# Age Verification Circuit Prover Input
+# Replace these values with actual field elements for your proof
+
+birth_date = "19900101"
+current_date = "20250517"
+age_threshold = "18"
+verification_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+
+# Membership Proof Circuit Prover Input
+# token_id = "42"
+# owner_private_key_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+# membership_tier = "1"
+# expiry_timestamp = "1735689600"

@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nft-fanclub-config
+  namespace: nft-fanclub
+  labels:
+    app.kubernetes.io/name: nft-fanclub
+    app.kubernetes.io/part-of: nft-platform
+data:
+  # Application
+  ENVIRONMENT: production
+  LOG_LEVEL: info
+  API_URL: https://api.nft-fanclub.example.com
+  FRONTEND_URL: https://nft-fanclub.example.com
+  CORS_ORIGINS: https://nft-fanclub.example.com
+
+  # Blockchain
+  CHAIN_ID: "137"
+  RPC_URL: https://polygon-rpc.com
+  CONTRACT_MEMBERSHIP_NFT: "0x..."
+  CONTRACT_AGE_VERIFICATION: "0x..."
+  CONTRACT_TOKEN_GATED_ACCESS: "0x..."
+  CONTRACT_COMPLIANCE_REGISTRY: "0x..."
+
+  # Auth
+  JWT_ALGORITHM: HS256
+  ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+  REFRESH_TOKEN_EXPIRE_MINUTES: "10080"
+
+  # Database
+  DB_HOST: nft-fanclub-postgres
+  DB_PORT: "5432"
+  DB_NAME: nft_fanclub
+
+  # Redis
+  REDIS_HOST: nft-fanclub-redis
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+
+  # Compliance
+  COMPLIANCE_LOG_LEVEL: info
+  AGE_VERIFICATION_THRESHOLD: "18"
+  KYC_ENABLED: "true"
+  AML_ENABLED: "true"
+
+  # Feature Flags
+  FF_ENABLE_AGE_VERIFICATION: "true"
+  FF_ENABLE_KYC: "true"
+  FF_ENABLE_AML: "true"
+  FF_ENABLE_ZK_PROOFS: "true"
+  FF_ENABLE_PAYMENTS: "true"
+  FF_ENABLE_WALLET_CONNECT: "true"
+  FF_MAINTENANCE_MODE: "false"
+
+  # Observability
+  OTEL_SERVICE_NAME: nft-fanclub
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  SENTRY_ENVIRONMENT: production
+  SENTRY_TRACES_SAMPLE_RATE: "0.2"
+
+  # Rate Limiting
+  RATE_LIMIT_PER_MINUTE: "100"
+  RATE_LIMIT_PER_HOUR: "1000"

@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nft-platform.fullname" . }}-config
+  labels:
+    {{- include "nft-platform.labels" . | nindent 4 }}
+data:
+  ENVIRONMENT: {{ .Values.backend.config.environment | default .Values.global.environment | quote }}
+  LOG_LEVEL: {{ .Values.backend.config.logLevel | quote }}
+  API_URL: {{ printf "https://%s" .Values.ingress.apiHost | quote }}
+  FRONTEND_URL: {{ printf "https://%s" .Values.ingress.host | quote }}
+  CORS_ORIGINS: {{ printf "https://%s" .Values.ingress.host | quote }}
+  CHAIN_ID: "137"
+  DB_HOST: {{ include "nft-platform.fullname" . }}-postgres
+  DB_PORT: {{ .Values.postgres.port | quote }}
+  DB_NAME: nft_fanclub
+  REDIS_HOST: {{ include "nft-platform.fullname" . }}-redis
+  REDIS_PORT: {{ .Values.redis.port | quote }}
+  REDIS_DB: "0"
+  JWT_ALGORITHM: HS256
+  ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+  REFRESH_TOKEN_EXPIRE_MINUTES: "10080"
+  COMPLIANCE_LOG_LEVEL: {{ .Values.backend.config.logLevel | quote }}
+  AGE_VERIFICATION_THRESHOLD: "18"
+  KYC_ENABLED: "true"
+  AML_ENABLED: "true"
+  FF_ENABLE_AGE_VERIFICATION: "true"
+  FF_ENABLE_KYC: "true"
+  FF_ENABLE_AML: "true"
+  FF_ENABLE_ZK_PROOFS: "true"
+  FF_ENABLE_PAYMENTS: "true"
+  FF_ENABLE_WALLET_CONNECT: "true"
+  FF_MAINTENANCE_MODE: "false"
+  OTEL_SERVICE_NAME: {{ include "nft-platform.fullname" . }}
+  SENTRY_ENVIRONMENT: {{ .Values.backend.config.environment | default .Values.global.environment | quote }}
+  RATE_LIMIT_PER_MINUTE: "100"
+  RATE_LIMIT_PER_HOUR: "1000"

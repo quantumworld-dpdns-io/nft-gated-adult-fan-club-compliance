@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f4f4f7;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        .header {
+            background: linear-gradient(135deg, #6b21a8, #7c3aed);
+            padding: 32px 24px;
+            text-align: center;
+        }
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .body {
+            padding: 32px 24px;
+            color: #334155;
+        }
+        .body p {
+            line-height: 1.6;
+            margin: 0 0 16px;
+        }
+        .button {
+            display: inline-block;
+            padding: 14px 32px;
+            background: linear-gradient(135deg, #6b21a8, #7c3aed);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 16px 0;
+        }
+        .button:hover {
+            background: linear-gradient(135deg, #581c87, #6d28d9);
+        }
+        .footer {
+            padding: 24px;
+            text-align: center;
+            color: #94a3b8;
+            font-size: 13px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .footer a {
+            color: #7c3aed;
+            text-decoration: none;
+        }
+        .code {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: 8px;
+            color: #7c3aed;
+            text-align: center;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Verify Your Email</h1>
+        </div>
+        <div class="body">
+            <p>Hi {{ username }},</p>
+            <p>Thank you for joining the NFT Fan Club! Please verify your email address to activate your account and unlock all features.</p>
+
+            <div style="text-align: center;">
+                <a href="{{ verification_link }}" class="button">Verify Email</a>
+            </div>
+
+            <p>Or use this verification code:</p>
+            <div class="code">{{ verification_code }}</div>
+
+            <p>This link will expire in <strong>24 hours</strong>.</p>
+            <p>If you did not create an account, please ignore this email.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2024 NFT Fan Club. All rights reserved.</p>
+            <p>
+                <a href="{{ unsubscribe_link }}">Unsubscribe</a> &middot;
+                <a href="{{ support_link }}">Contact Support</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

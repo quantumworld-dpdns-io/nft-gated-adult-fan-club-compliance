@@ -1,0 +1,211 @@
+{
+  "scanPolicy": {
+    "name": "API Security Scan Policy",
+    "threshold": "HIGH",
+    "attackStrength": "MEDIUM",
+    "alertThreshold": {
+      "HIGH": 0,
+      "MEDIUM": 5,
+      "LOW": 10,
+      "INFO": 50
+    },
+    "scanners": [
+      {
+        "id": 0,
+        "name": "Directory Browsing",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 1,
+        "name": "Cross Site Scripting (Reflected)",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 2,
+        "name": "Cross Site Scripting (Persistent)",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 3,
+        "name": "SQL Injection",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 4,
+        "name": "LDAP Injection",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 5,
+        "name": "Path Traversal",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 6,
+        "name": "Remote File Inclusion",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 7,
+        "name": "Server Side Include",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 8,
+        "name": "Command Injection",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 9,
+        "name": "CRLF Injection",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 10,
+        "name": "Authentication Bypass",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 11,
+        "name": "Session ID Prediction",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 12,
+        "name": "Insecure HTTP Methods",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 13,
+        "name": "Sensitive Data Exposure",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 14,
+        "name": "JWT Security Scanner",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 15,
+        "name": "GraphQL Injection",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 16,
+        "name": "NoSQL Injection",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 17,
+        "name": "Server Side Request Forgery",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 18,
+        "name": "Open Redirect",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 19,
+        "name": "Format String Injection",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 20,
+        "name": "HTTP Parameter Pollution",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 21,
+        "name": "Information Disclosure",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 22,
+        "name": "Weak Password Policy",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 23,
+        "name": "Mass Assignment",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 24,
+        "name": "Improper Asset Management",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 25,
+        "name": "Rate Limiting Issues",
+        "enabled": true,
+        "threshold": "HIGH"
+      }
+    ],
+    "rules": [
+      {
+        "id": 40012,
+        "name": "Cross Site Scripting (Reflected)",
+        "enabled": true,
+        "threshold": "HIGH",
+        "strength": "MEDIUM"
+      },
+      {
+        "id": 40018,
+        "name": "SQL Injection",
+        "enabled": true,
+        "threshold": "HIGH",
+        "strength": "HIGH"
+      },
+      {
+        "id": 90018,
+        "name": "API Endpoint Exposure",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 90019,
+        "name": "Auth Token Exposure",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 90020,
+        "name": "JWT Missing Validation",
+        "enabled": true,
+        "threshold": "HIGH"
+      },
+      {
+        "id": 90021,
+        "name": "CORS Misconfiguration",
+        "enabled": true,
+        "threshold": "HIGH"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+# Age Verification Circuit Verifier Input
+# These are the public inputs the verifier checks
+
+age_threshold = "18"
+verification_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+
+# Membership Proof Circuit Verifier Input
+# membership_tier = "1"
+# expiry_timestamp = "1735689600"

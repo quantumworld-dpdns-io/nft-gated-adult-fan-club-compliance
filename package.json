@@ -1,0 +1,34 @@
+{
+  "name": "nft-gated-adult-fan-club-compliance",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NFT-gated adult fan club compliance-first platform with ZK age verification",
+  "scripts": {
+    "backend:dev": "cd backend && uvicorn app.main:app --reload --port 8000",
+    "backend:test": "cd backend && pytest",
+    "backend:lint": "cd backend && ruff check . && ruff format --check .",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "frontend:test": "cd frontend && npm test",
+    "mobile:install": "cd mobile && npm install",
+    "mobile:test": "cd mobile && npx jest",
+    "mobile:appium": "cd mobile && npx wdio",
+    "contracts:compile": "cd contracts && npx hardhat compile",
+    "contracts:test": "cd contracts && npx hardhat test",
+    "contracts:size": "cd contracts && npx hardhat size-contracts",
+    "test:all": "npm run backend:test && npm run frontend:test && npm run contracts:test",
+    "test:security": "cd tests/security && ./run-owasp-scan.sh",
+    "test:e2e": "cd tests/e2e && npx playwright test",
+    "test:performance": "cd tests/performance && k6 run load-test.js",
+    "test:appium": "npm run mobile:appium",
+    "lint:all": "npm run backend:lint && cd frontend && npm run lint",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:test": "docker-compose -f docker-compose.test.yml up --abort-on-container-exit",
+    "ci:validate": "npm run lint:all && npm run test:all && npm run test:security",
+    "start": "npm run docker:up"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

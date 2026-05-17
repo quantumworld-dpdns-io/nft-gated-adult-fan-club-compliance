@@ -1,0 +1,202 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nft-fanclub-backend-monitor
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: nft-fanclub-backend
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: nft-platform
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: backend
+  namespaceSelector:
+    matchNames:
+      - nft-fanclub
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      honorLabels: true
+      relabelings:
+        - sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: node
+          action: replace
+        - sourceLabels:
+            - __meta_kubernetes_namespace
+          targetLabel: namespace
+          action: replace
+        - sourceLabels:
+            - __meta_kubernetes_service_name
+          targetLabel: service
+          action: replace
+        - sourceLabels:
+            - __meta_kubernetes_pod_name
+          targetLabel: pod
+          action: replace
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nft-fanclub-redis-monitor
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: nft-fanclub-redis
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: nft-platform
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: cache
+  namespaceSelector:
+    matchNames:
+      - nft-fanclub
+  endpoints:
+    - port: redis
+      targetPort: 9121
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: node
+          action: replace
+        - sourceLabels:
+            - __meta_kubernetes_namespace
+          targetLabel: namespace
+          action: replace
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: nft-fanclub-alert-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: nft-fanclub-alerts
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: nft-platform
+    release: prometheus
+spec:
+  groups:
+    - name: nft-fanclub-backend
+      interval: 30s
+      rules:
+        - alert: BackendDown
+          expr: up{job=~".*nft-fanclub-backend.*"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Backend service is down"
+            description: "Backend service {{ $labels.job }} has been down for more than 1 minute."
+            runbook_url: "https://wiki.example.com/runbooks/backend-down"
+
+        - alert: HighErrorRate
+          expr: |
+            rate(http_requests_total{status=~"5..", job=~".*nft-fanclub-backend.*"}[5m])
+            /
+            rate(http_requests_total{job=~".*nft-fanclub-backend.*"}[5m])
+            > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "High HTTP error rate on backend"
+            description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.job }}."
+            runbook_url: "https://wiki.example.com/runbooks/high-error-rate"
+
+        - alert: HighLatency
+          expr: |
+            histogram_quantile(0.95,
+              rate(http_request_duration_seconds_bucket{job=~".*nft-fanclub-backend.*"}[5m])
+            ) > 2
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "High latency on backend"
+            description: "P95 latency is {{ $value }}s on {{ $labels.job }}."
+            runbook_url: "https://wiki.example.com/runbooks/high-latency"
+
+        - alert: HighCPUUsage
+          expr: |
+            rate(container_cpu_usage_seconds_total{namespace="nft-fanclub"}[5m]) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "High CPU usage in nft-fanclub namespace"
+            description: "CPU usage is above 80% for 5 minutes."
+
+        - alert: HighMemoryUsage
+          expr: |
+            container_memory_working_set_bytes{namespace="nft-fanclub"}
+            / container_spec_memory_limit_bytes{namespace="nft-fanclub"}
+            > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "High memory usage in nft-fanclub namespace"
+            description: "Memory usage is above 85% for 5 minutes."
+
+        - alert: DatabaseConnectionPoolExhausted
+          expr: |
+            postgres_pool_available{job=~".*nft-fanclub-backend.*"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "PostgreSQL connection pool exhausted"
+            description: "No available connections in the pool for {{ $labels.job }}."
+            runbook_url: "https://wiki.example.com/runbooks/db-pool-exhausted"
+
+        - alert: RedisDown
+          expr: |
+            redis_up{job=~".*nft-fanclub.*"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Redis is down"
+            description: "Redis instance {{ $labels.job }} has been unreachable for 1 minute."
+            runbook_url: "https://wiki.example.com/runbooks/redis-down"
+
+        - alert: PodRestartLoop
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="nft-fanclub"}[10m]) > 1
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Pod restart loop detected"
+            description: "Pod {{ $labels.pod }} is restarting frequently."
+            runbook_url: "https://wiki.example.com/runbooks/pod-restart-loop"
+
+        - alert: CertificateExpiringSoon
+          expr: |
+            certificate_expiration_seconds{namespace="nft-fanclub"} < 604800
+          for: 1h
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "TLS certificate expiring soon"
+            description: "Certificate {{ $labels.name }} expires in {{ $value | humanizeDuration }}."
+            runbook_url: "https://wiki.example.com/runbooks/certificate-renewal"

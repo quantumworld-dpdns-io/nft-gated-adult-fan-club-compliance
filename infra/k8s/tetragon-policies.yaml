@@ -1,0 +1,209 @@
+# Cilium Tetragon Tracing Policies for Runtime Security
+# These policies operate in observation/alert mode -- no enforcement.
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: detect-shell-execution
+  labels:
+    app.kubernetes.io/name: nft-fanclub-tetragon
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: nft-platform
+spec:
+  kprobes:
+    - call: "security_file_open"
+      syscall: false
+      args:
+        - index: 0
+          type: "file"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "/bin/sh"
+                - "/bin/bash"
+                - "/bin/dash"
+                - "/bin/zsh"
+                - "/bin/ksh"
+                - "/bin/csh"
+                - "/bin/ash"
+                - "/bin/tcsh"
+          matchActions:
+            - action: Sigkill
+              argError: 0
+              arg: 0
+      # Only alert in the nft-fanclub namespace
+      matchNamespaces:
+        - namespace: nft-fanclub
+          operator: In
+          values:
+            - "nft-fanclub"
+      # Kubernetes-aware enrichment
+      matchBinary:
+        - operator: "NotEqual"
+          values:
+            - "" # Not used; namespaced check is above
+
+---
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: detect-package-manager-execution
+  labels:
+    app.kubernetes.io/name: nft-fanclub-tetragon
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: nft-platform
+spec:
+  kprobes:
+    - call: "sys_execve"
+      syscall: true
+      args:
+        - index: 0
+          type: "string"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "/usr/bin/apt"
+                - "/usr/bin/apt-get"
+                - "/usr/bin/apk"
+                - "/usr/bin/yum"
+                - "/usr/bin/dnf"
+                - "/usr/bin/rpm"
+                - "/usr/bin/dpkg"
+                - "/usr/bin/pacman"
+                - "/usr/bin/zypper"
+                - "/usr/bin/emerge"
+          matchActions:
+            - action: Sigkill
+              argError: 0
+              arg: 0
+      matchNamespaces:
+        - namespace: nft-fanclub
+          operator: In
+          values:
+            - "nft-fanclub"
+
+---
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: detect-writable-path-execution
+  labels:
+    app.kubernetes.io/name: nft-fanclub-tetragon
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: nft-platform
+spec:
+  kprobes:
+    - call: "sys_execve"
+      syscall: true
+      args:
+        - index: 0
+          type: "string"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Prefix"
+              values:
+                - "/tmp/"
+                - "/dev/shm/"
+                - "/var/tmp/"
+                - "/run/"
+                - "/proc/"
+          matchActions:
+            - action: Sigkill
+              argError: 0
+              arg: 0
+      matchNamespaces:
+        - namespace: nft-fanclub
+          operator: In
+          values:
+            - "nft-fanclub"
+
+---
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: detect-crypto-miner
+  labels:
+    app.kubernetes.io/name: nft-fanclub-tetragon
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: nft-platform
+spec:
+  kprobes:
+    - call: "sys_execve"
+      syscall: true
+      args:
+        - index: 0
+          type: "string"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "/usr/bin/xmrig"
+                - "/usr/local/bin/xmrig"
+                - "/opt/xmrig/xmrig"
+                - "/usr/bin/cpuminer"
+                - "/usr/local/bin/cpuminer"
+                - "/usr/bin/ethminer"
+                - "/usr/local/bin/ethminer"
+                - "/usr/bin/t-rex"
+                - "/usr/local/bin/t-rex"
+                - "/usr/bin/nbminer"
+                - "/usr/local/bin/nbminer"
+                - "/usr/bin/lolminer"
+                - "/usr/local/bin/lolminer"
+                - "/usr/bin/teamredminer"
+                - "/usr/local/bin/teamredminer"
+                - "/usr/bin/phoenixminer"
+                - "/usr/local/bin/phoenixminer"
+                - "/usr/bin/gminer"
+                - "/usr/local/bin/gminer"
+          matchActions:
+            - action: Sigkill
+              argError: 0
+              arg: 0
+      matchNamespaces:
+        - namespace: nft-fanclub
+          operator: In
+          values:
+            - "nft-fanclub"
+
+---
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: detect-netcat-socat
+  labels:
+    app.kubernetes.io/name: nft-fanclub-tetragon
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: nft-platform
+spec:
+  kprobes:
+    - call: "sys_execve"
+      syscall: true
+      args:
+        - index: 0
+          type: "string"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "/usr/bin/nc"
+                - "/usr/bin/nc.traditional"
+                - "/usr/bin/ncat"
+                - "/usr/bin/socat"
+                - "/bin/nc"
+                - "/bin/nc.traditional"
+          matchActions:
+            - action: Sigkill
+              argError: 0
+              arg: 0
+      matchNamespaces:
+        - namespace: nft-fanclub
+          operator: In
+          values:
+            - "nft-fanclub"

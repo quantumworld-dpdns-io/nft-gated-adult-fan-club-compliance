@@ -22,3 +22,40 @@ vendor/
 .env
 .env.*
 !.env.example
+
+# Testing
+coverage/
+htmlcov/
+.coverage
+coverage.xml
+.tox/
+test-results.xml
+junit-*.xml
+*.log
+
+# Artifacts
+artifacts/
+cache/
+out/
+typechain-types/
+
+# Security reports
+bandit-report.json
+zap-report.html
+zap-report.json
+dependency-check-report.html
+trivy-report.json
+
+# Mobile
+mobile/tests/appium/reports/
+mobile/tests/appium/screenshots/
+android/
+ios/
+
+# ZK
+zk-circuits/**/target/
+zk-circuits/**/Prover.toml
+zk-circuits/**/Verifier.toml
+
+# K8s
+*.kubeconfig

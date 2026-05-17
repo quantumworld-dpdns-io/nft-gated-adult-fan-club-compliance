@@ -1,0 +1,62 @@
+# Extra dependencies to check with safety/pip-audit
+# These are beyond the main requirements.txt and include
+# transitive dependencies that should be monitored
+
+# Web3 / Blockchain
+web3>=7.3.0
+eth-account>=0.13.3
+
+# Cryptography
+cryptography>=41.0.0
+pycryptodome>=3.19.0
+
+# JWT
+python-jose>=3.3.0
+jwcrypto>=1.5.0
+
+# Database
+asyncpg>=0.30.0
+aiosqlite>=0.20.0
+psycopg2-binary>=2.9.9
+
+# HTTP / Network
+httpx>=0.27.0
+httpcore>=1.0.0
+websockets>=12.0
+
+# Serialization
+pydantic>=2.9.0
+orjson>=3.10.0
+
+# ZK Proofs
+py-noir>=0.1.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
+fakeredis>=2.22.0
+freezegun>=1.5.0
+
+# Security
+passlib>=1.7.4
+bcrypt>=4.1.0
+python-multipart>=0.0.12
+python-dotenv>=1.0.0
+
+# Infrastructure
+redis>=5.1.0
+celery>=5.4.0
+sentry-sdk>=2.13.0
+prometheus-client>=0.21.0
+opentelemetry-api>=1.27.0
+
+# Check for known vulnerabilities in these version ranges
+# Note: Run 'safety check -r requirements-check.txt' for full scan
+# Also run 'pip-audit' for transitive dependency scanning
+
+# Known problematic transitive deps to monitor:
+# starlette (used by FastAPI)
+# uvicorn
+# anyio
+# httptools
+# aiofiles

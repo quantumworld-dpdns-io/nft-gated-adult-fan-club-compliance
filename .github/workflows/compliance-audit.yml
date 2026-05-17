@@ -1,0 +1,190 @@
+name: Compliance Audit
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.12'
+  COMPLIANCE_REPORT_DIR: compliance-reports
+
+jobs:
+  generate-audit:
+    name: Generate Compliance Report
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: nft_fanclub
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ secrets.COMPLIANCE_DB_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install openpyxl
+
+      - name: Create reports directory
+        run: mkdir -p ${{ env.COMPLIANCE_REPORT_DIR }}
+
+      - name: Generate compliance report
+        run: |
+          python backend/scripts/generate_compliance_report.py \
+            --output-dir ${{ env.COMPLIANCE_REPORT_DIR }} \
+            --date $(date +%Y-%m-%d)
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:${{ secrets.COMPLIANCE_DB_PASSWORD }}@localhost:5432/nft_fanclub
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ENVIRONMENT: production
+
+      - name: Generate audit summary
+        run: |
+          echo "## Compliance Audit Report - $(date +%Y-%m-%d)" > ${{ env.COMPLIANCE_REPORT_DIR }}/summary.md
+          echo "" >> ${{ env.COMPLIANCE_REPORT_DIR }}/summary.md
+          echo "### Report Contents" >> ${{ env.COMPLIANCE_REPORT_DIR }}/summary.md
+          ls -la ${{ env.COMPLIANCE_REPORT_DIR }}/ >> ${{ env.COMPLIANCE_REPORT_DIR }}/summary.md
+
+      - name: Archive compliance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report-${{ github.run_id }}
+          path: ${{ env.COMPLIANCE_REPORT_DIR }}/
+          retention-days: 90
+
+      - name: Send report to compliance team
+        env:
+          COMPLIANCE_WEBHOOK_URL: ${{ secrets.COMPLIANCE_WEBHOOK_URL }}
+          COMPLIANCE_EMAIL: ${{ secrets.COMPLIANCE_EMAIL }}
+        run: |
+          if [ -n "$COMPLIANCE_WEBHOOK_URL" ]; then
+            curl -X POST "$COMPLIANCE_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "type": "compliance_report",
+                "date": "'$(date +%Y-%m-%d)'",
+                "run_id": "${{ github.run_id }}",
+                "status": "completed",
+                "message": "Daily compliance audit report generated"
+              }' || true
+          fi
+          echo "Compliance report notification sent"
+
+  check-expired-verifications:
+    name: Check Expired Age Verifications
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: nft_fanclub
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ secrets.COMPLIANCE_DB_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check expired verifications
+        id: check-expired
+        run: |
+          python backend/scripts/check_expired_verifications.py \
+            --days-threshold 30 \
+            --format json \
+            --output expired-verifications.json
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:${{ secrets.COMPLIANCE_DB_PASSWORD }}@localhost:5432/nft_fanclub
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ENVIRONMENT: production
+
+      - name: Upload expired verifications report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: expired-verifications-${{ github.run_id }}
+          path: expired-verifications.json
+          if-no-files-found: ignore
+
+      - name: Notify affected users
+        if: success()
+        env:
+          NOTIFICATION_WEBHOOK: ${{ secrets.NOTIFICATION_WEBHOOK_URL }}
+        run: |
+          python backend/scripts/notify_expired_verifications.py \
+            --input expired-verifications.json \
+            --webhook "$NOTIFICATION_WEBHOOK" || true
+
+  audit-summary:
+    name: Compliance Audit Summary
+    needs: [generate-audit, check-expired-verifications]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate final summary
+        run: |
+          echo "## Daily Compliance Audit - $(date +%Y-%m-%d)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          AUDIT_STATUS="${{ needs.generate-audit.result }}"
+          EXPIRED_STATUS="${{ needs.check-expired-verifications.result }}"
+
+          if [ "$AUDIT_STATUS" = "success" ]; then
+            echo "✅ **Audit Report:** Generated successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Audit Report:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$EXPIRED_STATUS" = "success" ]; then
+            echo "✅ **Expired Verifications:** Checked successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Expired Verifications:** Check failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Run ID: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
