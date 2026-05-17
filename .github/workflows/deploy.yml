@@ -1,0 +1,184 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  KUBE_NAMESPACE: nft-platform
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.nft-fanclub.example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubeconfig
+        uses: azure/k8s-set-context@v4
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBECONFIG_STAGING }}
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG_STAGING }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.15.0'
+
+      - name: Helm dependency update
+        run: helm dependency update infra/helm/
+        continue-on-error: true
+
+      - name: Helm upgrade staging
+        run: |
+          helm upgrade --install nft-platform infra/helm/ \
+            --namespace ${{ env.KUBE_NAMESPACE }} \
+            --create-namespace \
+            --values infra/helm/values-staging.yaml \
+            --set image.tag=${{ github.sha }} \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --wait \
+            --timeout 10m \
+            --atomic
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/backend \
+            --namespace ${{ env.KUBE_NAMESPACE }} \
+            --timeout=5m
+          kubectl rollout status deployment/frontend \
+            --namespace ${{ env.KUBE_NAMESPACE }} \
+            --timeout=5m
+
+      - name: Run k6 smoke tests
+        uses: grafana/k6-action@v0.3.1
+        continue-on-error: true
+        with:
+          filename: tests/performance/smoke-test.js
+          flags: --out json=k6-results.json
+        env:
+          BASE_URL: https://staging.nft-fanclub.example.com
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-staging-results
+          path: k6-results.json
+
+  e2e-staging:
+    name: E2E Tests against Staging
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Playwright
+        run: |
+          cd frontend
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: |
+          cd frontend
+          npx playwright test --config playwright.config.ts \
+            --base-url https://staging.nft-fanclub.example.com
+        env:
+          PLAYWRIGHT_BASE_URL: https://staging.nft-fanclub.example.com
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-staging
+          path: frontend/playwright-report/
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [deploy-staging, e2e-staging]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://nft-fanclub.example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubeconfig
+        uses: azure/k8s-set-context@v4
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBECONFIG_PRODUCTION }}
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG_PRODUCTION }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.15.0'
+
+      - name: Helm dependency update
+        run: helm dependency update infra/helm/
+        continue-on-error: true
+
+      - name: Helm upgrade production
+        run: |
+          helm upgrade --install nft-platform infra/helm/ \
+            --namespace ${{ env.KUBE_NAMESPACE }} \
+            --create-namespace \
+            --values infra/helm/values-production.yaml \
+            --set image.tag=${{ github.sha }} \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --wait \
+            --timeout 15m \
+            --atomic
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/backend \
+            --namespace ${{ env.KUBE_NAMESPACE }} \
+            --timeout=10m
+          kubectl rollout status deployment/frontend \
+            --namespace ${{ env.KUBE_NAMESPACE }} \
+            --timeout=10m
+
+      - name: Run post-deploy smoke tests
+        uses: grafana/k6-action@v0.3.1
+        continue-on-error: true
+        with:
+          filename: tests/performance/smoke-test.js
+          flags: --out json=k6-results.json
+        env:
+          BASE_URL: https://nft-fanclub.example.com
+
+      - name: Notify deployment
+        if: success()
+        run: |
+          echo "Deployment to production successful!"
+          echo "Commit: ${{ github.sha }}"
+          echo "Triggered by: ${{ github.triggering_actor }}"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment to production failed. Rolling back..."
+          helm rollback nft-platform --namespace ${{ env.KUBE_NAMESPACE }}

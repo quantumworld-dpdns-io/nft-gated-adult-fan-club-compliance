@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nft-fanclub-redis
+  namespace: nft-fanclub
+  labels:
+    app.kubernetes.io/name: nft-fanclub-redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: nft-platform
+spec:
+  clusterIP: None
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: nft-fanclub-redis
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nft-fanclub-redis
+  namespace: nft-fanclub
+  labels:
+    app.kubernetes.io/name: nft-fanclub-redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: nft-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nft-fanclub-redis
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nft-fanclub-redis
+        app.kubernetes.io/component: cache
+        app.kubernetes.io/part-of: nft-platform
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - redis-server
+            - /usr/local/etc/redis/redis.conf
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+            - name: redis-config
+              mountPath: /usr/local/etc/redis
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: nft-fanclub-redis-pvc
+        - name: redis-config
+          configMap:
+            name: nft-fanclub-redis-config
+            optional: true
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nft-fanclub-redis-pvc
+  namespace: nft-fanclub
+  labels:
+    app.kubernetes.io/name: nft-fanclub-redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: nft-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 5Gi

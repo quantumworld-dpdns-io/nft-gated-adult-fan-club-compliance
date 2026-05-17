@@ -1,0 +1,195 @@
+name: Smart Contracts
+
+on:
+  push:
+    paths:
+      - contracts/**
+      - .github/workflows/smart-contracts.yml
+    branches: [main, dev]
+  pull_request:
+    paths:
+      - contracts/**
+      - .github/workflows/smart-contracts.yml
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  REPORT_GAS: true
+
+jobs:
+  compile:
+    name: Compile Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Install dependencies
+        run: cd contracts && npm ci
+
+      - name: Hardhat compile
+        run: cd contracts && npx hardhat compile
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Cache compiled artifacts
+        uses: actions/cache@v4
+        with:
+          path: contracts/artifacts/
+          key: ${{ runner.os }}-hardhat-${{ hashFiles('contracts/**/*.sol', 'contracts/**/*.ts') }}
+
+  test:
+    name: Contract Tests & Gas Report
+    needs: compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Install dependencies
+        run: cd contracts && npm ci
+
+      - name: Restore compiled artifacts
+        uses: actions/cache@v4
+        with:
+          path: contracts/artifacts/
+          key: ${{ runner.os }}-hardhat-${{ hashFiles('contracts/**/*.sol', 'contracts/**/*.ts') }}
+
+      - name: Run tests with gas reporter
+        run: cd contracts && npx hardhat test
+        env:
+          REPORT_GAS: ${{ env.REPORT_GAS }}
+
+      - name: Run coverage
+        run: cd contracts && npx hardhat coverage
+        continue-on-error: true
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solidity-coverage
+          path: contracts/coverage/
+          if-no-files-found: ignore
+
+      - name: Upload gas report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gas-report
+          path: contracts/gas-report.txt
+          if-no-files-found: ignore
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-test-results
+          path: contracts/test-results.xml
+          if-no-files-found: ignore
+
+  slither:
+    name: Static Analysis - Slither
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.4.0
+        continue-on-error: true
+        with:
+          target: contracts/
+          sarif: results.sarif
+
+      - name: Upload SARIF report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-report
+          path: contracts/results.sarif
+          if-no-files-found: ignore
+
+  mythril:
+    name: Security Analysis - Mythril
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Mythril
+        run: pip install mythril
+
+      - name: Run Mythril analysis
+        run: |
+          cd contracts
+          myth analyze --solc-json mythril.config.json --execution-timeout 120 \
+            --max-depth 15 --outdated-dispatch \
+            -o mythril-report.json \
+            contracts/**/*.sol || true
+
+      - name: Upload Mythril report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mythril-report
+          path: contracts/mythril-report.json
+          if-no-files-found: ignore
+
+  coverage:
+    name: Solidity Coverage
+    needs: compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Install dependencies
+        run: cd contracts && npm ci
+
+      - name: Restore compiled artifacts
+        uses: actions/cache@v4
+        with:
+          path: contracts/artifacts/
+          key: ${{ runner.os }}-hardhat-${{ hashFiles('contracts/**/*.sol', 'contracts/**/*.ts') }}
+
+      - name: Run solidity-coverage
+        run: cd contracts && npx hardhat coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-coverage
+          path: contracts/coverage/
+
+      - name: Generate coverage badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          COVERAGE=$(grep -oP 'Lines: \K[0-9.]+(?=%)' contracts/coverage/index.html | head -1 || echo "0")
+          echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV

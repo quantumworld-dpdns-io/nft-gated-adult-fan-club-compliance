@@ -1,0 +1,95 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nft-fanclub-ingress
+  namespace: nft-fanclub
+  labels:
+    app.kubernetes.io/name: nft-fanclub-ingress
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: nft-platform
+  annotations:
+    # Cert-Manager / Let's Encrypt
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/acme-challenge-type: http01
+
+    # Ingress Controller
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-body-size: 10m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-API-Key"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://nft-fanclub.example.com"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
+
+    # Rate Limiting
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+    nginx.ingress.kubernetes.io/limit-rpm: "1000"
+    nginx.ingress.kubernetes.io/limit-connections: "100"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    nginx.ingress.kubernetes.io/limit-whitelist: "10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16"
+
+    # ModSecurity WAF
+    nginx.ingress.kubernetes.io/enable-modsecurity: "true"
+    nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
+    nginx.ingress.kubernetes.io/modsecurity-snippet: |
+      SecRuleEngine On
+      SecRequestBodyAccess On
+      SecResponseBodyAccess On
+      SecResponseBodyMimeType text/plain text/html text/xml application/json
+      SecDefaultAction "phase:1,log,auditlog,pass"
+      SecDefaultAction "phase:2,log,auditlog,pass"
+
+    # Security Headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Permissions-Policy: camera=(), microphone=(), geolocation=()";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+
+    # Block bad user agents
+    nginx.ingress.kubernetes.io/server-snippet: |
+      if ($http_user_agent ~* (bot|crawler|spider|scanner|masscan|nikto|sqlmap|nmap|wpscan|acunetix|nessus) ) {
+        return 403;
+      }
+
+    # Monitoring
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "10254"
+
+spec:
+  tls:
+    - hosts:
+        - api.nft-fanclub.example.com
+        - nft-fanclub.example.com
+      secretName: nft-fanclub-tls
+  rules:
+    - host: api.nft-fanclub.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nft-fanclub-backend
+                port:
+                  number: 8000
+    - host: nft-fanclub.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nft-fanclub-frontend
+                port:
+                  number: 80
